@@ -1,0 +1,8 @@
+torch
+torchaudio
+datasets
+librosa
+matplotlib
+numpy
+scikit-learn
+huggingface_hub
