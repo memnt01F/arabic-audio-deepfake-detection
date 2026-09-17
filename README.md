@@ -47,10 +47,10 @@ them out.
 
 ---
 
-## Quick start (no audio needed) — reproduce the proposal plots
+## Quick start  — reproduce the proposal plots
 
-The label tables (`train.csv`, `test.csv`, a few MB) are enough to reproduce
-every distribution plot in the proposal — you do **not** need the 18 GB of audio.
+The label tables (`train.csv`, `test.csv`) are enough to reproduce
+every distribution plot in the proposal
 
 ```bash
 pip install pandas matplotlib
