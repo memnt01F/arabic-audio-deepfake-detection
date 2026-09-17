@@ -1,6 +1,6 @@
 # Arabic Audio Deepfake Detection
 
-**ICS 471 â€” Deep Learning course project proposal**  
+**ICS 471 ” Deep Learning course project proposal**  
 King Fahd University of Petroleum & Minerals (KFUPM)
 
 **Team:** Reem Alghuzawi and Maiss Khalaf
@@ -87,13 +87,10 @@ The script creates these files inside `figures/`:
 
 In the next phase, we plan to:
 
-- download and preprocess the audio;
 - convert audio into mel-spectrograms;
 - implement and train a CNN using PyTorch;
 - keep the official test split untouched;
 - evaluate the model using Equal Error Rate (EER) as the main metric;
-- later investigate group-disjoint splitting, class imbalance handling, F1,
-  and confusion matrices.
 
 These training steps are planned and are not claimed to be completed in this
 proposal repository.
