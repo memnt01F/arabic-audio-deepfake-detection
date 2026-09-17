@@ -3,7 +3,7 @@
 **ICS 471 — Deep Learning · Course Project (proposal-supporting code)**
 King Fahd University of Petroleum & Minerals (KFUPM)
 
-**Team:** [Name 1] · [Name 2] · [Name 3]
+**Team Members:** Reem Alghuzawi, Maiss Khalaf
 
 Detects whether an Arabic speech clip is a **real human voice (bona fide)** or
 **synthetic** speech from a text-to-speech / voice-cloning system. Supervised
