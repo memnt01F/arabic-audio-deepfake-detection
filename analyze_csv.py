@@ -1,22 +1,7 @@
 """
 analyze_csv.py
 --------------
-Analyzes ArFake's label tables (train.csv, test.csv) WITHOUT needing the 18 GB
-of audio. Prints class balance, generator, and dialect breakdowns, and saves
-the distribution plots required by the proposal.
-
-Each CSV has two columns:
-  Path   e.g. "fish-speech-new/Morocco/bonafied/original_19037_3.wav"
-  Label  0 = bona fide (real), 1 = spoof (fake)
-Generator and dialect are parsed from the Path.
-
-USAGE
-  # put train.csv and test.csv in the same folder as this script, then:
-  python analyze_csv.py
-  # or point at them explicitly:
-  python analyze_csv.py --train path\to\train.csv --test path\to\test.csv --out figures
-
-Dependencies:  pip install pandas matplotlib
+Analyzes ArFake's label tables (train.csv, test.csv). 
 """
 
 import argparse
