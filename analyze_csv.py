@@ -1,118 +1,150 @@
-"""
-analyze_csv.py
---------------
-Analyzes ArFake's label tables (train.csv, test.csv). 
+"""Analyze the ArFake label files.
 """
 
-import argparse
-import os
-import re
+from pathlib import Path
 
-import numpy as np
-import pandas as pd
-import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
-NAVY = "#1F2A44"; RED = "#9E2B25"; GREEN = "#2E6B3E"
-plt.rcParams["font.size"] = 11
+import pandas as pd
 
 
-def parse_path(p):
-    """Extract (generator, dialect, is_bonafide) from the Path string."""
-    parts = str(p).replace("\\", "/").split("/")
-    gen = parts[0] if len(parts) > 0 else "unknown"
-    dia = parts[1] if len(parts) > 1 else "unknown"
-    is_bona = bool(re.search("bona", str(p).lower()))
-    return gen, dia, is_bona
+# File locations.
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
+figures_folder = Path("figures")
+figures_folder.mkdir(exist_ok=True)
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--train", default="train.csv")
-    ap.add_argument("--test", default="test.csv")
-    ap.add_argument("--out", default="figures")
-    args = ap.parse_args()
-    os.makedirs(args.out, exist_ok=True)
-
-    tr = pd.read_csv(args.train)
-    te = pd.read_csv(args.test)
-    print("train:", tr.shape, " test:", te.shape)
-    print("columns:", list(tr.columns))
-
-    print("\n=== Label counts (train) ===")
-    print(tr.Label.value_counts())
-    print("\n=== Label counts (test) ===")
-    print(te.Label.value_counts())
-
-    # parse metadata from paths
-    for df in (tr, te):
-        g, d, b = zip(*[parse_path(p) for p in df.Path])
-        df["generator"] = g
-        df["dialect"] = d
-        df["is_bona_path"] = b
-
-    alldf = pd.concat([tr.assign(split="train"), te.assign(split="test")],
-                      ignore_index=True)
-
-    print("\n=== Generator breakdown (all) ===")
-    print(alldf.generator.value_counts())
-    print("\n=== Dialect breakdown (all) ===")
-    print(alldf.dialect.value_counts())
-    print("\n=== Label vs generator (all) ===")
-    print(pd.crosstab(alldf.generator, alldf.Label))
-    print("\n=== Sanity: bona-by-path vs Label==0 ===")
-    print("path-bona:", int(alldf.is_bona_path.sum()),
-          " label0:", int((alldf.Label == 0).sum()))
-
-    imb = (alldf.Label == 1).mean() * 100
-    print(f"\n>>> Spoof share overall: {imb:.1f}%  (dataset is imbalanced)")
-
-    # ---- Fig 1: class balance train vs test ----
-    labels_sorted = sorted(alldf.Label.unique())
-    names = ["bona fide (0)" if l == 0 else f"spoof ({l})" for l in labels_sorted]
-    tr_counts = [(tr.Label == l).sum() for l in labels_sorted]
-    te_counts = [(te.Label == l).sum() for l in labels_sorted]
-    x = np.arange(len(labels_sorted)); w = 0.38
-    fig, ax = plt.subplots(figsize=(5.2, 3.6))
-    ax.bar(x - w/2, tr_counts, w, label="train", color=NAVY)
-    ax.bar(x + w/2, te_counts, w, label="test", color=RED)
-    ax.set_xticks(x); ax.set_xticklabels(names)
-    ax.set_ylabel("Number of clips"); ax.set_title("Class balance: bona fide vs spoof")
-    ax.legend(); plt.tight_layout()
-    plt.savefig(os.path.join(args.out, "class_balance.png"), dpi=150); plt.close()
-
-    # ---- Fig 2: by generator ----
-    gc = alldf.generator.value_counts()
-    fig, ax = plt.subplots(figsize=(6, 3.6))
-    ax.bar(gc.index, gc.values, color=NAVY)
-    ax.set_ylabel("Number of clips"); ax.set_title("Samples by source / generator")
-    plt.xticks(rotation=25, ha="right"); plt.tight_layout()
-    plt.savefig(os.path.join(args.out, "by_generator.png"), dpi=150); plt.close()
-
-    # ---- Fig 3: by dialect ----
-    dc = alldf.dialect.value_counts()
-    fig, ax = plt.subplots(figsize=(6.4, 3.6))
-    ax.bar(dc.index, dc.values, color=NAVY)
-    ax.set_ylabel("Number of clips"); ax.set_title("Samples by dialect")
-    plt.xticks(rotation=25, ha="right"); plt.tight_layout()
-    plt.savefig(os.path.join(args.out, "by_dialect.png"), dpi=150); plt.close()
-
-    # ---- Fig 4: real vs fake within each source ----
-    ct = pd.crosstab(alldf.generator, alldf.Label)
-    fig, ax = plt.subplots(figsize=(6.4, 3.6))
-    bottom = np.zeros(len(ct)); colors = [GREEN, RED, "#c77", "#a44"]
-    for i, l in enumerate(ct.columns):
-        ax.bar(ct.index, ct[l].values, bottom=bottom,
-               label=("bona fide" if l == 0 else f"spoof {l}"),
-               color=colors[i % len(colors)])
-        bottom += ct[l].values
-    ax.set_ylabel("Number of clips"); ax.set_title("Real vs fake within each source")
-    plt.xticks(rotation=25, ha="right"); ax.legend(); plt.tight_layout()
-    plt.savefig(os.path.join(args.out, "gen_label_stacked.png"), dpi=150); plt.close()
-
-    print(f"\nFigures written to {os.path.abspath(args.out)}")
+# Convert the numeric labels into readable names.
+label_names = {
+    0: "Bona fide (real)",
+    1: "Spoof (fake)",
+}
+label_order = ["Bona fide (real)", "Spoof (fake)"]
 
 
-if __name__ == "__main__":
-    main()
+def add_information(data):
+    """Extract the source and dialect from each Path."""
+    data = data.copy()
+
+    # Example path:
+    # fish-speech-new/Morocco/bonafied/file.wav
+    path_parts = (
+        data["Path"]
+        .astype(str)
+        .str.replace("\\", "/", regex=False)
+        .str.split("/")
+    )
+
+    data["source"] = path_parts.str[0]
+    data["dialect"] = path_parts.str[1]
+    data["class_name"] = data["Label"].map(label_names)
+
+    return data
+
+
+train = add_information(train)
+test = add_information(test)
+
+all_data = pd.concat(
+    [train.assign(split="train"), test.assign(split="test")],
+    ignore_index=True,
+)
+
+
+print(f"Train rows: {len(train):,}")
+print(f"Test rows:  {len(test):,}")
+print(f"Total rows: {len(all_data):,}")
+
+print("\nTrain labels:")
+print(train["class_name"].value_counts().reindex(label_order, fill_value=0))
+
+print("\nTest labels:")
+print(test["class_name"].value_counts().reindex(label_order, fill_value=0))
+
+print("\nSamples by source group:")
+print(all_data["source"].value_counts())
+
+print("\nSamples by dialect:")
+print(all_data["dialect"].value_counts())
+
+print("\nReal/fake counts within each source group:")
+print(
+    pd.crosstab(all_data["source"], all_data["class_name"])
+    .reindex(columns=label_order, fill_value=0)
+)
+
+spoof_percentage = all_data["Label"].eq(1).mean() * 100
+print(f"\nOverall spoof percentage: {spoof_percentage:.1f}%")
+
+
+def save_plot(filename):
+    """Save the current plot in the figures folder."""
+    plt.tight_layout()
+    plt.savefig(figures_folder / filename, dpi=200, bbox_inches="tight")
+    plt.close()
+    print(f"Saved: {figures_folder / filename}")
+
+
+# Figure 1: class balance in train and test.
+class_counts = pd.crosstab(all_data["split"], all_data["class_name"])
+class_counts = class_counts.reindex(
+    index=["train", "test"],
+    columns=label_order,
+    fill_value=0,
+)
+class_counts.plot(
+    kind="bar",
+    color=["#2E6B3E", "#9E2B25"],
+    figsize=(7, 4),
+)
+plt.title("Class balance: bona fide vs spoof")
+plt.xlabel("Dataset split")
+plt.ylabel("Number of clips")
+plt.xticks(rotation=0)
+plt.legend(title="Class")
+save_plot("class_balance.png")
+
+
+# Figure 2: number of clips from each source group.
+all_data["source"].value_counts().sort_values().plot(
+    kind="barh",
+    color="#1F2A44",
+    figsize=(7, 4),
+)
+plt.title("Samples by source group")
+plt.xlabel("Number of clips")
+plt.ylabel("Source group")
+save_plot("by_source.png")
+
+
+# Figure 3: number of clips from each dialect.
+all_data["dialect"].value_counts().sort_values().plot(
+    kind="barh",
+    color="#1F2A44",
+    figsize=(7, 4),
+)
+plt.title("Samples by dialect")
+plt.xlabel("Number of clips")
+plt.ylabel("Dialect")
+save_plot("by_dialect.png")
+
+
+# Figure 4: real and fake clips within each source group.
+source_class_counts = pd.crosstab(
+    all_data["source"], all_data["class_name"]
+).reindex(columns=label_order, fill_value=0)
+source_class_counts.plot(
+    kind="bar",
+    stacked=True,
+    color=["#2E6B3E", "#9E2B25"],
+    figsize=(7, 4),
+)
+plt.title("Real vs fake clips within each source group")
+plt.xlabel("Source group")
+plt.ylabel("Number of clips")
+plt.xticks(rotation=25)
+plt.legend(title="Class")
+save_plot("source_label_stacked.png")
+
+print(f"\nAll figures were saved in: {figures_folder.resolve()}")
+
